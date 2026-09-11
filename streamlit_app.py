@@ -31,14 +31,44 @@ LANGUAGES = {
     "বাংলা": "Bengali",
 }
 
+STYLES = {
+    "Tecnico": """
+Usa un registro tecnico-professionale, ma chiaro.
+Mantieni la terminologia normativa e tecnica presente nelle fonti.
+Non semplificare termini tecnici se questo ne altera il significato.
+""",
+    "Semplice": """
+Usa frasi brevi e parole comuni.
+Spiega i termini tecnici quando compaiono.
+Mantieni invariati numeri, misure e riferimenti normativi.
+Evita formulazioni burocratiche quando puoi esprimere lo stesso concetto in modo più chiaro.
+""",
+    "Molto semplice": """
+Usa frasi molto brevi, una sola idea per frase.
+Preferisci parole comuni.
+Se devi usare un termine tecnico, spiegalo subito tra parentesi.
+Non eliminare numeri, misure, obblighi o riferimenti normativi presenti nelle fonti.
+Non banalizzare il contenuto tecnico.
+""",
+}
+
 with st.sidebar:
     st.header("Impostazioni")
+
     output_language_label = st.selectbox(
         "Lingua della risposta",
         list(LANGUAGES.keys()),
         index=0
     )
     output_language = LANGUAGES[output_language_label]
+
+    response_style_label = st.selectbox(
+        "Stile della risposta",
+        list(STYLES.keys()),
+        index=1,
+        help="Scegli quanto vuoi rendere il contenuto tecnico più accessibile."
+    )
+    response_style = STYLES[response_style_label]
 
     st.divider()
     st.subheader("Fonti")
@@ -68,6 +98,19 @@ def split_text(text, chunk_size=1300, overlap=220):
         start = max(0, end - overlap)
     return chunks
 
+def pretty_source_name(filename):
+    name = filename.lower()
+
+    if "parapett" in name:
+        return "INAIL – Parapetti provvisori"
+    if "trabatt" in name or "volume" in name:
+        return "INAIL – Trabattelli"
+    if "ponteggi" in name or "facciata" in name:
+        return "INAIL – I ponteggi di facciata"
+    if "81" in name and ("dlgs" in name or "d.lgs" in name or "testo" in name):
+        return "D.Lgs. 9 aprile 2008, n. 81"
+    return filename
+
 @st.cache_data(show_spinner=False)
 def extract_chunks(file_payloads):
     records = []
@@ -80,6 +123,7 @@ def extract_chunks(file_payloads):
             for chunk_number, chunk in enumerate(split_text(text), start=1):
                 records.append({
                     "source": filename,
+                    "source_pretty": pretty_source_name(filename),
                     "page": page_number,
                     "chunk": chunk_number,
                     "text": chunk,
@@ -95,13 +139,17 @@ def get_client():
             'e inserisci: GEMINI_API_KEY = "LA_TUA_CHIAVE"'
         )
         st.stop()
+
     return genai.Client(api_key=api_key)
 
 def translate_query_to_italian(client, question):
     prompt = f"""
 Traduci la domanda seguente in italiano per permettere una ricerca documentale.
-Mantieni invariati numeri, misure, sigle, articoli di legge e termini tecnici.
-Restituisci SOLTANTO la traduzione italiana, senza commenti.
+
+REGOLE:
+- Mantieni invariati numeri, misure, sigle, articoli di legge e termini tecnici.
+- Non aggiungere spiegazioni.
+- Restituisci SOLTANTO la traduzione italiana.
 
 DOMANDA:
 {question}
@@ -112,17 +160,20 @@ DOMANDA:
     )
     return response.text.strip()
 
-def retrieve(question_it, records, top_k=6):
+def retrieve(question_it, records, top_k=8):
     texts = [r["text"] for r in records]
+
     vectorizer = TfidfVectorizer(
         lowercase=True,
         strip_accents="unicode",
         ngram_range=(1, 2),
         max_features=60000
     )
+
     matrix = vectorizer.fit_transform(texts)
     query_vector = vectorizer.transform([question_it])
     scores = cosine_similarity(query_vector, matrix).flatten()
+
     ranked = scores.argsort()[::-1][:top_k]
 
     results = []
@@ -130,30 +181,38 @@ def retrieve(question_it, records, top_k=6):
         item = dict(records[idx])
         item["score"] = float(scores[idx])
         results.append(item)
+
     return results
 
-def answer_from_context(client, question, results, output_language):
+def answer_from_context(client, question, results, output_language, response_style):
     context_parts = []
+
     for i, item in enumerate(results, start=1):
         context_parts.append(
-            f"[FONTE {i}: {item['source']}, pagina {item['page']}]\n{item['text']}"
+            f"[FONTE {i}: {item['source_pretty']}, file {item['source']}, pagina {item['page']}]\n"
+            f"{item['text']}"
         )
+
     context = "\n\n".join(context_parts)
 
     prompt = f"""
 Sei "IA in cantiere", un assistente EDUCATIVO sulla salute e sicurezza nei cantieri.
 
 REGOLE OBBLIGATORIE:
-1. Rispondi esclusivamente usando le informazioni contenute nel CONTESTO.
-2. Non usare conoscenze esterne e non inventare obblighi, divieti, misure, distanze,
-   sanzioni, procedure, articoli di legge o requisiti tecnici.
-3. Se il contesto non è sufficiente, dillo chiaramente e invita l'utente a consultare
-   una fonte ufficiale o un professionista della prevenzione.
-4. Mantieni invariati numeri, unità di misura e riferimenti normativi presenti nel contesto.
-5. Usa frasi brevi, concrete e comprensibili.
+1. Rispondi esclusivamente usando le informazioni contenute nel CONTESTO DOCUMENTALE.
+2. Non usare conoscenze esterne.
+3. Non inventare obblighi, divieti, misure, distanze, sanzioni, procedure,
+   articoli di legge o requisiti tecnici.
+4. Se il contesto non è sufficiente, dillo chiaramente.
+5. Mantieni invariati numeri, unità di misura e riferimenti normativi presenti nel contesto.
 6. Non presentare la risposta come sostitutiva della formazione o delle procedure aziendali.
 7. Rispondi in {output_language}.
-8. Non inventare citazioni. I riferimenti alle fonti saranno mostrati separatamente dall'app.
+8. Non inventare citazioni.
+9. Non aggiungere informazioni solo perché sembrano ragionevoli.
+10. Se due fonti sembrano in contrasto, segnala che è necessaria una verifica e non scegliere arbitrariamente.
+
+STILE RICHIESTO:
+{response_style}
 
 DOMANDA DELL'UTENTE:
 {question}
@@ -161,11 +220,29 @@ DOMANDA DELL'UTENTE:
 CONTESTO DOCUMENTALE:
 {context}
 """
+
     response = client.models.generate_content(
         model="gemini-3.6-flash",
         contents=prompt
     )
+
     return response.text.strip()
+
+def unique_source_results(results, max_items=5):
+    unique = []
+    seen = set()
+
+    for item in results:
+        key = (item["source"], item["page"])
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(item)
+
+        if len(unique) >= max_items:
+            break
+
+    return unique
 
 if not uploaded_files:
     st.warning("Per iniziare, carica almeno un PDF nella barra laterale.")
@@ -183,7 +260,9 @@ if not records:
     )
     st.stop()
 
-st.success(f"Fonti pronte: {len(uploaded_files)} PDF, {len(records)} sezioni indicizzate.")
+st.success(
+    f"Fonti pronte: {len(uploaded_files)} PDF, {len(records)} sezioni indicizzate."
+)
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -195,7 +274,11 @@ for msg in st.session_state.messages:
 question = st.chat_input("Scrivi una domanda sulla sicurezza in cantiere...")
 
 if question:
-    st.session_state.messages.append({"role": "user", "content": question})
+    st.session_state.messages.append({
+        "role": "user",
+        "content": question
+    })
+
     with st.chat_message("user"):
         st.markdown(question)
 
@@ -204,7 +287,12 @@ if question:
     with st.chat_message("assistant"):
         with st.spinner("Cerco nelle fonti e preparo la risposta..."):
             question_it = translate_query_to_italian(client, question)
-            results = retrieve(question_it, records, top_k=6)
+
+            results = retrieve(
+                question_it,
+                records,
+                top_k=8
+            )
 
             best_score = results[0]["score"] if results else 0.0
 
@@ -218,27 +306,39 @@ if question:
                     client,
                     question,
                     results,
-                    output_language
+                    output_language,
+                    response_style
                 )
 
         st.markdown(answer)
 
-        if results:
-            with st.expander("📚 Fonti recuperate"):
-                seen = set()
-                for item in results:
-                    key = (item["source"], item["page"])
-                    if key in seen:
-                        continue
-                    seen.add(key)
-                    st.write(
-                        f"• **{item['source']}**, pagina {item['page']} "
-                        f"(pertinenza: {item['score']:.2f})"
+        source_results = unique_source_results(results, max_items=5)
+
+        if source_results:
+            with st.expander("📚 Fonti utilizzate"):
+                for item in source_results:
+                    st.markdown(
+                        f"**{item['source_pretty']}**  \n"
+                        f"Pagina {item['page']}  \n"
+                        f"*File: {item['source']}*"
                     )
+
+                    with st.expander(
+                        f"Mostra il passaggio recuperato – pagina {item['page']}"
+                    ):
+                        excerpt = item["text"]
+                        if len(excerpt) > 1200:
+                            excerpt = excerpt[:1200] + "..."
+                        st.write(excerpt)
+
+                    st.divider()
 
         st.caption(
             "⚠️ Strumento a scopo formativo. Verificare sempre procedure aziendali, "
             "documentazione ufficiale e indicazioni dei soggetti della prevenzione."
         )
 
-    st.session_state.messages.append({"role": "assistant", "content": answer})
+    st.session_state.messages.append({
+        "role": "assistant",
+        "content": answer
+    })
