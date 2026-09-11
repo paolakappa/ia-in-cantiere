@@ -107,7 +107,7 @@ DOMANDA:
 {question}
 """
     response = client.models.generate_content(
-        model="gemini-2.5-flash",
+        model="gemini-3.6-flash",
         contents=prompt
     )
     return response.text.strip()
@@ -162,7 +162,7 @@ CONTESTO DOCUMENTALE:
 {context}
 """
     response = client.models.generate_content(
-        model="gemini-2.5-flash",
+        model="gemini-3.6-flash",
         contents=prompt
     )
     return response.text.strip()
