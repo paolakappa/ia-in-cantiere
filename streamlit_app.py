@@ -1,6 +1,7 @@
 import io
 import json
 import re
+from pathlib import Path
 import streamlit as st
 from pypdf import PdfReader
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -152,11 +153,16 @@ with st.sidebar:
     st.divider()
     st.subheader("Fonti")
 
+    st.caption(
+        "I documenti ufficiali inclusi nel progetto vengono caricati automaticamente. "
+        "Qui puoi aggiungere altri PDF senza modificare il sito."
+    )
+
     uploaded_files = st.file_uploader(
-        "Carica uno o più PDF",
+        "Aggiungi PDF facoltativi",
         type=["pdf"],
         accept_multiple_files=True,
-        help="Esempi: D.Lgs. 81/08, documenti INAIL, linee guida, manuali ufficiali."
+        help="Esempi: D.Lgs. 81/08 aggiornato, ulteriori documenti INAIL, linee guida o manuali ufficiali."
     )
 
     st.divider()
@@ -511,14 +517,35 @@ CONTESTO DOCUMENTALE:
 # ------------------------------------------------------------
 # PREPARAZIONE FONTI
 # ------------------------------------------------------------
-if not uploaded_files:
+APP_DIR = Path(__file__).parent
+
+# Tutti i PDF presenti nella cartella del progetto vengono considerati fonti permanenti.
+bundled_pdf_paths = sorted(APP_DIR.glob("*.pdf"))
+
+bundled_payloads = []
+for pdf_path in bundled_pdf_paths:
+    try:
+        bundled_payloads.append((pdf_path.name, pdf_path.read_bytes()))
+    except Exception:
+        pass
+
+uploaded_payloads = []
+if uploaded_files:
+    uploaded_payloads = [(f.name, f.getvalue()) for f in uploaded_files]
+
+# Evita duplicati se un PDF permanente viene anche caricato manualmente.
+combined = {}
+for filename, payload in bundled_payloads + uploaded_payloads:
+    combined[filename] = payload
+
+file_payloads = tuple(combined.items())
+
+if not file_payloads:
     st.warning(
-        "Per iniziare, carica almeno un PDF nella barra laterale. "
-        "Puoi usare, ad esempio, i documenti INAIL che hai già raccolto."
+        "Non risultano fonti disponibili. Inserisci almeno un PDF nel repository "
+        "oppure caricalo dalla barra laterale."
     )
     st.stop()
-
-file_payloads = tuple((f.name, f.getvalue()) for f in uploaded_files)
 
 with st.spinner("Leggo e preparo le fonti..."):
     records = extract_chunks(file_payloads)
@@ -526,13 +553,25 @@ with st.spinner("Leggo e preparo le fonti..."):
 if not records:
     st.error(
         "Non sono riuscito a estrarre testo dai PDF. "
-        "Il documento potrebbe essere una scansione composta solo da immagini."
+        "Uno o più documenti potrebbero essere scansioni composte solo da immagini."
     )
     st.stop()
 
 st.success(
-    f"Fonti pronte: {len(uploaded_files)} PDF, {len(records)} sezioni indicizzate."
+    f"Fonti pronte: {len(file_payloads)} PDF "
+    f"({len(bundled_payloads)} permanenti, {len(uploaded_payloads)} aggiunti), "
+    f"{len(records)} sezioni indicizzate."
 )
+
+with st.expander("📚 Documenti disponibili"):
+    if bundled_pdf_paths:
+        st.markdown("**Fonti permanenti del prototipo**")
+        for pdf_path in bundled_pdf_paths:
+            st.write(f"• {pretty_source_name(pdf_path.name)}")
+    if uploaded_files:
+        st.markdown("**Fonti aggiunte in questa sessione**")
+        for f in uploaded_files:
+            st.write(f"• {pretty_source_name(f.name)}")
 
 # ------------------------------------------------------------
 # SESSION STATE
