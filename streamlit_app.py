@@ -219,6 +219,31 @@ def pretty_source_name(filename):
 
     return filename
 
+def extract_article_refs(text):
+    """
+    Cerca riferimenti del tipo:
+    Art. 111
+    art. 113
+    Articolo 107
+    articolo 37-bis
+    """
+    if not text:
+        return []
+
+    patterns = [
+        r"\bart\.?\s*(\d+(?:[-–]\w+)?)\b",
+        r"\barticolo\s+(\d+(?:[-–]\w+)?)\b",
+    ]
+
+    found = []
+    for pattern in patterns:
+        for match in re.findall(pattern, text, flags=re.IGNORECASE):
+            normalized = str(match).replace("–", "-")
+            if normalized not in found:
+                found.append(normalized)
+
+    return found
+
 @st.cache_data(show_spinner=False)
 def extract_chunks(file_payloads):
     records = []
@@ -232,12 +257,21 @@ def extract_chunks(file_payloads):
             if not text:
                 continue
 
+            page_articles = extract_article_refs(text)
+
             for chunk_number, chunk in enumerate(split_text(text), start=1):
+                chunk_articles = extract_article_refs(chunk)
+
+                # Se il chunk non contiene il titolo dell'articolo ma la pagina sì,
+                # conserva comunque il riferimento della pagina.
+                article_refs = chunk_articles if chunk_articles else page_articles
+
                 records.append({
                     "source": filename,
                     "source_pretty": pretty_source_name(filename),
                     "page": page_number,
                     "chunk": chunk_number,
+                    "articles": article_refs,
                     "text": chunk,
                 })
 
@@ -310,8 +344,12 @@ def build_context(results):
     parts = []
 
     for i, item in enumerate(results, start=1):
+        article_text = ""
+        if item.get("articles"):
+            article_text = ", articoli " + ", ".join(item["articles"])
+
         parts.append(
-            f"[FONTE {i}: {item['source_pretty']}, file {item['source']}, pagina {item['page']}]\n"
+            f"[FONTE {i}: {item['source_pretty']}{article_text}, file {item['source']}, pagina {item['page']}]\n"
             f"{item['text']}"
         )
 
@@ -343,8 +381,14 @@ def show_sources(results, title="📚 Fonti utilizzate"):
 
     with st.expander(title):
         for item in source_results:
+            article_html = ""
+            if item.get("articles"):
+                labels = ", ".join(f"art. {a}" for a in item["articles"][:6])
+                article_html = f"<b>Riferimenti:</b> {labels}<br>"
+
             st.markdown(
                 f"<div class='source-box'><b>{item['source_pretty']}</b><br>"
+                f"{article_html}"
                 f"Pagina {item['page']}<br>"
                 f"<span class='small-muted'>File: {item['source']}</span></div>",
                 unsafe_allow_html=True
@@ -391,6 +435,11 @@ REGOLE OBBLIGATORIE:
 8. Non inventare citazioni.
 9. Non aggiungere informazioni solo perché sembrano ragionevoli.
 10. Se due fonti sembrano in contrasto, segnala che è necessaria una verifica.
+11. Se nel contesto è presente un riferimento normativo esplicito (es. art. 111, art. 113),
+    cita SOLO quegli articoli effettivamente presenti nel contesto.
+12. Quando pertinente, chiudi la risposta con una riga breve:
+    "Riferimento normativo: D.Lgs. 81/2008, art. X."
+    Non inventare mai un articolo non presente nel contesto.
 
 STILE RICHIESTO:
 {response_style}
@@ -435,6 +484,8 @@ REGOLE:
 - Mantieni invariati numeri, misure e riferimenti normativi.
 - Rispondi in {output_language}.
 - Non scrivere fonti inventate: l'app le mostrerà separatamente.
+- Se nel contesto è presente un articolo del D.Lgs. 81/2008 pertinente alla lezione,
+  puoi indicarlo in fondo come "Riferimento normativo", ma SOLO se compare davvero nel contesto.
 - Ricorda che lo strumento è formativo e non sostitutivo della formazione obbligatoria.
 
 STILE:
@@ -486,6 +537,8 @@ REGOLE:
 - Una sola alternativa deve essere corretta.
 - L'indice della risposta corretta deve essere 0, 1 oppure 2.
 - L'explanation deve spiegare perché la risposta corretta è corretta usando solo il contesto.
+- Se nel contesto è presente un articolo normativo pertinente, l'explanation può citarlo,
+  ma SOLO se compare davvero nel contesto.
 - Rispondi in {output_language}.
 - Linguaggio coerente con questo stile:
 {response_style}
