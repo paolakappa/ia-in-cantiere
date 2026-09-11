@@ -1,0 +1,24 @@
+IA IN CANTIERE v0.4 — ISTRUZIONI
+
+Questa versione carica automaticamente i PDF presenti nel repository.
+Non è più necessario caricarli ogni volta dalla barra laterale.
+
+COME AGGIORNARE GITHUB
+1. Estrai questo ZIP.
+2. Nel repository ia-in-cantiere apri streamlit_app.py e sostituisci il contenuto con quello nuovo.
+3. Torna alla pagina principale del repository.
+4. Premi Add file -> Upload files.
+5. Trascina questi quattro PDF:
+   - INAIL_Parapetti_provvisori_2018.pdf
+   - INAIL_Ponteggi_di_facciata_2021.pdf
+   - INAIL_Trabattelli_2022.pdf
+   - Manuale_sicurezza_cantieri_2017.pdf
+6. Premi Commit changes.
+7. Attendi il riavvio automatico di Streamlit oppure usa Manage app -> Reboot app.
+
+NON inserire la chiave Gemini nei file GitHub.
+La chiave resta nei Secrets di Streamlit.
+
+NOTA:
+Quando avrai il PDF ufficiale aggiornato del D.Lgs. 81/2008, potrai caricarlo nello stesso modo:
+basta aggiungerlo al repository e il sito lo leggerà automaticamente.
