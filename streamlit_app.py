@@ -1,6 +1,7 @@
 import io
 import json
 import re
+import time
 from pathlib import Path
 import streamlit as st
 from pypdf import PdfReader
@@ -346,7 +347,7 @@ with st.sidebar:
     st.divider()
     st.markdown("**🎓 Progetto accademico**")
     st.caption(
-        "Versione v0.8 · interfaccia responsive · prototipo sperimentale sviluppato per una tesi sulla formazione "
+        "Versione v0.8.1 · responsive + retry automatico · prototipo sperimentale sviluppato per una tesi sulla formazione "
         "alla salute e sicurezza nei cantieri."
     )
 
@@ -554,11 +555,43 @@ def get_client():
     return genai.Client(api_key=api_key)
 
 def generate_text(client, prompt):
-    response = client.models.generate_content(
-        model="gemini-3.6-flash",
-        contents=prompt
-    )
-    return response.text.strip()
+    """
+    Genera testo con retry automatico e modello di riserva.
+    Gli errori 500/503/429 possono essere temporanei lato API.
+    """
+    models = ["gemini-3.6-flash", "gemini-3.5-flash-lite"]
+    last_error = None
+
+    for model in models:
+        for attempt, delay in enumerate((0, 2), start=1):
+            if delay:
+                time.sleep(delay)
+
+            try:
+                response = client.models.generate_content(
+                    model=model,
+                    contents=prompt
+                )
+                if response.text:
+                    return response.text.strip()
+                last_error = RuntimeError("Risposta vuota dal modello")
+            except Exception as exc:
+                last_error = exc
+                msg = str(exc).lower()
+
+                retryable = any(token in msg for token in (
+                    "503", "unavailable", "500", "internal",
+                    "servererror", "429", "resource_exhausted",
+                    "temporarily", "overloaded", "high demand"
+                ))
+
+                # Errori non temporanei (es. chiave API non valida) non vanno reiterati.
+                if not retryable:
+                    raise
+
+    raise RuntimeError(
+        "Il servizio Gemini è temporaneamente occupato. Riprova tra qualche secondo."
+    ) from last_error
 
 def translate_query_to_italian(client, question):
     prompt = f"""
@@ -1097,60 +1130,94 @@ with tab_chat:
             st.markdown(question)
 
         with st.chat_message("assistant"):
-            with st.spinner("Cerco nelle fonti e preparo la risposta..."):
-                question_it = translate_query_to_italian(client, question)
+            results = []
+            best_score = 0.0
+            answer = None
 
-                search_query = (
-                    f"{topic_info['query']} {question_it}"
-                )
+            try:
+                with st.spinner("Cerco nelle fonti e preparo la risposta..."):
+                    # Prima prova la domanda così com'è: per le domande in italiano
+                    # evita una chiamata Gemini non necessaria e rende il sito più robusto.
+                    raw_search_query = f"{topic_info['query']} {question}"
+                    results = retrieve(raw_search_query, records, top_k=8)
+                    best_score = results[0]["score"] if results else 0.0
 
-                results = retrieve(
-                    search_query,
-                    records,
-                    top_k=8
-                )
+                    # Solo se la corrispondenza è debole prova a tradurre la query in italiano.
+                    # Se l'API è momentaneamente indisponibile, continuiamo con la ricerca locale.
+                    if best_score < 0.035:
+                        try:
+                            question_it = translate_query_to_italian(client, question)
+                            translated_results = retrieve(
+                                f"{topic_info['query']} {question_it}",
+                                records,
+                                top_k=8
+                            )
+                            translated_best = translated_results[0]["score"] if translated_results else 0.0
+                            if translated_best > best_score:
+                                results = translated_results
+                                best_score = translated_best
+                        except Exception:
+                            pass
 
-                best_score = results[0]["score"] if results else 0.0
+                    if best_score < 0.015:
+                        answer = (
+                            "Non ho trovato nei documenti caricati un passaggio sufficientemente "
+                            "pertinente per rispondere in modo affidabile."
+                        )
+                    else:
+                        answer = answer_from_context(
+                            client,
+                            question,
+                            selected_topic,
+                            results,
+                            output_language,
+                            response_style
+                        )
 
-                if best_score < 0.015:
-                    answer = (
-                        "Non ho trovato nei documenti caricati un passaggio sufficientemente "
-                        "pertinente per rispondere in modo affidabile."
+            except Exception as exc:
+                msg = str(exc).lower()
+                if any(token in msg for token in (
+                    "503", "unavailable", "500", "internal", "servererror",
+                    "429", "resource_exhausted", "temporaneamente", "high demand"
+                )):
+                    st.warning(
+                        "🤖 Il servizio di generazione è temporaneamente occupato. "
+                        "La ricerca nei documenti funziona, ma Gemini non ha completato la risposta. "
+                        "Attendi qualche secondo e riprova."
                     )
                 else:
-                    answer = answer_from_context(
-                        client,
-                        question,
-                        selected_topic,
-                        results,
-                        output_language,
-                        response_style
+                    st.error(
+                        "Non sono riuscito a completare la risposta. "
+                        "Controlla la configurazione della chiave API oppure riprova."
                     )
+                answer = None
 
-            st.markdown(answer)
-            show_transparency(results, best_score)
-            show_sources(results)
+            if answer is not None:
+                st.markdown(answer)
+                show_transparency(results, best_score)
+                show_sources(results)
 
-            export_text = build_download_text(question, answer, results)
-            st.download_button(
-                "⬇️ Esporta risposta e fonti",
-                data=export_text,
-                file_name="ia_in_cantiere_risposta.txt",
-                mime="text/plain",
-                use_container_width=False
-            )
+                export_text = build_download_text(question, answer, results)
+                st.download_button(
+                    "⬇️ Esporta risposta e fonti",
+                    data=export_text,
+                    file_name="ia_in_cantiere_risposta.txt",
+                    mime="text/plain",
+                    use_container_width=False
+                )
 
-            st.caption(
-                "⚠️ Strumento a scopo formativo. Verificare sempre procedure aziendali, "
-                "documentazione ufficiale e indicazioni dei soggetti della prevenzione."
-            )
+                st.caption(
+                    "⚠️ Strumento a scopo formativo. Verificare sempre procedure aziendali, "
+                    "documentazione ufficiale e indicazioni dei soggetti della prevenzione."
+                )
 
-        st.session_state.messages.append({
-            "role": "assistant",
-            "content": answer,
-            "sources": results,
-            "best_score": best_score
-        })
+        if answer is not None:
+            st.session_state.messages.append({
+                "role": "assistant",
+                "content": answer,
+                "sources": results,
+                "best_score": best_score
+            })
 
 # ------------------------------------------------------------
 # TAB MICRO-LEZIONE
