@@ -24,37 +24,59 @@ st.markdown("""
 <style>
 .block-container {
     max-width: 1180px;
-    padding-top: 2rem;
+    padding-top: 1.6rem;
     padding-bottom: 3rem;
 }
 .hero {
-    padding: 1.2rem 1.4rem;
-    border: 1px solid rgba(120,120,120,.20);
-    border-radius: 18px;
+    padding: 1.65rem 1.7rem;
+    border: 1px solid rgba(120,120,120,.18);
+    border-radius: 22px;
     margin-bottom: 1rem;
+    background: linear-gradient(135deg, rgba(255,193,7,.12), rgba(25,118,210,.07));
+    box-shadow: 0 8px 28px rgba(0,0,0,.05);
 }
-.hero h1 {
-    margin-bottom: .2rem;
-}
-.hero p {
-    margin-bottom: 0;
-    font-size: 1.05rem;
-}
-.topic-box {
+.hero h1 { margin-bottom: .25rem; font-size: 2.35rem; }
+.hero p { margin-bottom: .65rem; font-size: 1.08rem; }
+.badge {
+    display: inline-block;
+    padding: .28rem .58rem;
+    margin-right: .35rem;
+    margin-top: .2rem;
+    border-radius: 999px;
     border: 1px solid rgba(120,120,120,.22);
+    font-size: .82rem;
+    font-weight: 600;
+    background: rgba(255,255,255,.45);
+}
+.topic-box, .feature-box, .flow-box {
+    border: 1px solid rgba(120,120,120,.20);
     border-radius: 16px;
     padding: 1rem;
-    min-height: 120px;
-    margin-bottom: .5rem;
+    margin-bottom: .55rem;
+    background: rgba(255,255,255,.025);
 }
-.small-muted {
-    opacity: .75;
-    font-size: .92rem;
-}
+.topic-box { min-height: 128px; }
+.feature-box { min-height: 128px; }
+.flow-box { text-align: center; min-height: 92px; }
+.small-muted { opacity: .75; font-size: .92rem; }
 .source-box {
     border-left: 4px solid #999;
     padding-left: 0.8rem;
     margin-bottom: 0.8rem;
+}
+.coverage-box {
+    border: 1px solid rgba(120,120,120,.20);
+    border-radius: 14px;
+    padding: .75rem .9rem;
+    margin: .7rem 0;
+}
+.footer {
+    margin-top: 2.2rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(120,120,120,.18);
+    opacity: .72;
+    text-align: center;
+    font-size: .88rem;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -62,7 +84,11 @@ st.markdown("""
 st.markdown("""
 <div class="hero">
 <h1>🦺 IA in cantiere</h1>
-<p>Assistente educativo multilingue per la sicurezza nei cantieri</p>
+<p><b>Assistente educativo multilingue per la sicurezza nei cantieri</b></p>
+<span class="badge">🎓 Prototipo di tesi</span>
+<span class="badge">📚 Fonti verificabili</span>
+<span class="badge">🌍 8 lingue</span>
+<span class="badge">🔎 Risposte tracciabili</span>
 </div>
 """, unsafe_allow_html=True)
 
@@ -110,22 +136,42 @@ TOPICS = {
     "Cadute dall'alto": {
         "emoji": "⚠️",
         "description": "Lavori in quota, rischio di caduta e protezioni collettive.",
-        "query": "cadute dall'alto lavori in quota rischio protezioni collettive parapetti prevenzione"
+        "query": "cadute dall'alto lavori in quota rischio protezioni collettive parapetti prevenzione",
+        "prompts": [
+            "Quando un lavoro è considerato lavoro in quota?",
+            "Quali protezioni collettive sono previste contro le cadute dall'alto?",
+            "Quali sono i principali rischi nelle cadute dall'alto?"
+        ]
     },
     "Scale portatili": {
         "emoji": "🪜",
         "description": "Scelta, uso, stabilità, appoggio e condizioni di impiego.",
-        "query": "scale portatili uso lavoro in quota stabilità appoggio presa sicurezza"
+        "query": "scale portatili uso lavoro in quota stabilità appoggio presa sicurezza",
+        "prompts": [
+            "Quali condizioni devono essere verificate prima di usare una scala portatile?",
+            "Come deve essere posizionata una scala portatile?",
+            "Quando una scala portatile non è adatta al lavoro da svolgere?"
+        ]
     },
     "Parapetti": {
         "emoji": "🚧",
         "description": "Parapetti provvisori, protezione dei bordi, scelta e utilizzo.",
-        "query": "parapetti provvisori protezione collettiva bordi caduta dall'alto montaggio uso"
+        "query": "parapetti provvisori protezione collettiva bordi caduta dall'alto montaggio uso",
+        "prompts": [
+            "A cosa serve un parapetto provvisorio?",
+            "Quali elementi deve avere un parapetto?",
+            "Quando è necessario proteggere un bordo contro la caduta?"
+        ]
     },
     "Ponteggi e trabattelli": {
         "emoji": "🏗️",
         "description": "Ponteggi, PiMUS, trabattelli, stabilità, montaggio e uso.",
-        "query": "ponteggi fissi trabattelli PiMUS montaggio uso smontaggio stabilità protezione"
+        "query": "ponteggi fissi trabattelli PiMUS montaggio uso smontaggio stabilità protezione",
+        "prompts": [
+            "Che cos'è il PiMUS?",
+            "Quali controlli sono importanti prima di utilizzare un trabattello?",
+            "Quali aspetti incidono sulla stabilità di un trabattello?"
+        ]
     },
 }
 
@@ -149,6 +195,13 @@ with st.sidebar:
         help="Scegli quanto vuoi rendere il contenuto tecnico più accessibile."
     )
     response_style = STYLES[response_style_label]
+
+    st.divider()
+    st.markdown("**🎓 Progetto accademico**")
+    st.caption(
+        "Versione v0.7 · prototipo sperimentale sviluppato per una tesi sulla formazione "
+        "alla salute e sicurezza nei cantieri."
+    )
 
     st.divider()
     st.subheader("Fonti")
@@ -185,16 +238,25 @@ def clean_text(text):
     text = re.sub(r"\s+", " ", text)
     return text.strip()
 
-def split_text(text, chunk_size=1300, overlap=220):
+def split_text_with_offsets(text, chunk_size=1300, overlap=220):
+    """
+    Divide il testo in blocchi mantenendo la posizione del blocco
+    all'interno della pagina. Serve per associare il blocco all'articolo
+    normativo più vicino.
+    """
     chunks = []
     start = 0
 
     while start < len(text):
         end = min(start + chunk_size, len(text))
-        chunk = text[start:end].strip()
+        raw_chunk = text[start:end]
+        chunk = raw_chunk.strip()
 
         if chunk:
-            chunks.append(chunk)
+            # Calcola dove inizia davvero il testo dopo eventuali spazi iniziali.
+            left_trim = len(raw_chunk) - len(raw_chunk.lstrip())
+            real_start = start + left_trim
+            chunks.append((chunk, real_start, end))
 
         if end == len(text):
             break
@@ -244,6 +306,54 @@ def extract_article_refs(text):
 
     return found
 
+def find_article_headings(text):
+    """
+    Restituisce gli articoli presenti nella pagina con la loro posizione.
+    Cerca forme come:
+    Art. 111
+    ARTICOLO 113
+    Articolo 107
+    """
+    if not text:
+        return []
+
+    pattern = re.compile(
+        r"\b(?:art\.?|articolo)\s*(\d+(?:[-–][A-Za-z0-9]+)?)\b",
+        flags=re.IGNORECASE
+    )
+
+    headings = []
+    for match in pattern.finditer(text):
+        article = match.group(1).replace("–", "-")
+        headings.append({
+            "article": article,
+            "position": match.start()
+        })
+
+    return headings
+
+
+def closest_article_for_chunk(page_text, chunk_text, chunk_start, headings):
+    """
+    Associa il chunk all'articolo più plausibile:
+    1. se nel chunk compare esplicitamente un articolo, usa quello;
+    2. altrimenti usa l'ultimo articolo che compare PRIMA dell'inizio del chunk.
+    In questo modo evita di mostrare tutti gli articoli presenti nella stessa pagina.
+    """
+    explicit = extract_article_refs(chunk_text)
+    if explicit:
+        return explicit[:2]
+
+    previous = [
+        h for h in headings
+        if h["position"] <= chunk_start
+    ]
+
+    if previous:
+        return [previous[-1]["article"]]
+
+    return []
+
 @st.cache_data(show_spinner=False)
 def extract_chunks(file_payloads):
     records = []
@@ -257,14 +367,18 @@ def extract_chunks(file_payloads):
             if not text:
                 continue
 
-            page_articles = extract_article_refs(text)
+            article_headings = find_article_headings(text)
 
-            for chunk_number, chunk in enumerate(split_text(text), start=1):
-                chunk_articles = extract_article_refs(chunk)
-
-                # Se il chunk non contiene il titolo dell'articolo ma la pagina sì,
-                # conserva comunque il riferimento della pagina.
-                article_refs = chunk_articles if chunk_articles else page_articles
+            for chunk_number, (chunk, chunk_start, chunk_end) in enumerate(
+                split_text_with_offsets(text),
+                start=1
+            ):
+                article_refs = closest_article_for_chunk(
+                    text,
+                    chunk,
+                    chunk_start,
+                    article_headings
+                )
 
                 records.append({
                     "source": filename,
@@ -316,28 +430,29 @@ DOMANDA:
 # ------------------------------------------------------------
 # RICERCA DOCUMENTALE
 # ------------------------------------------------------------
-def retrieve(query, records, top_k=8):
-    texts = [r["text"] for r in records]
-
+@st.cache_resource(show_spinner=False)
+def build_search_index(texts):
     vectorizer = TfidfVectorizer(
         lowercase=True,
         strip_accents="unicode",
         ngram_range=(1, 2),
         max_features=60000
     )
+    matrix = vectorizer.fit_transform(list(texts))
+    return vectorizer, matrix
 
-    matrix = vectorizer.fit_transform(texts)
+def retrieve(query, records, top_k=8):
+    texts = tuple(r["text"] for r in records)
+    vectorizer, matrix = build_search_index(texts)
     query_vector = vectorizer.transform([query])
     scores = cosine_similarity(query_vector, matrix).flatten()
     ranked = scores.argsort()[::-1][:top_k]
 
     results = []
-
     for idx in ranked:
         item = dict(records[idx])
         item["score"] = float(scores[idx])
         results.append(item)
-
     return results
 
 def build_context(results):
@@ -346,7 +461,10 @@ def build_context(results):
     for i, item in enumerate(results, start=1):
         article_text = ""
         if item.get("articles"):
-            article_text = ", articoli " + ", ".join(item["articles"])
+            if len(item["articles"]) == 1:
+                article_text = ", articolo " + item["articles"][0]
+            else:
+                article_text = ", articoli " + ", ".join(item["articles"][:2])
 
         parts.append(
             f"[FONTE {i}: {item['source_pretty']}{article_text}, file {item['source']}, pagina {item['page']}]\n"
@@ -383,8 +501,11 @@ def show_sources(results, title="📚 Fonti utilizzate"):
         for item in source_results:
             article_html = ""
             if item.get("articles"):
-                labels = ", ".join(f"art. {a}" for a in item["articles"][:6])
-                article_html = f"<b>Riferimenti:</b> {labels}<br>"
+                if len(item["articles"]) == 1:
+                    article_html = f"<b>Riferimento:</b> art. {item['articles'][0]}<br>"
+                else:
+                    labels = ", ".join(f"art. {a}" for a in item["articles"][:2])
+                    article_html = f"<b>Riferimenti:</b> {labels}<br>"
 
             st.markdown(
                 f"<div class='source-box'><b>{item['source_pretty']}</b><br>"
@@ -394,15 +515,61 @@ def show_sources(results, title="📚 Fonti utilizzate"):
                 unsafe_allow_html=True
             )
 
-            with st.expander(
-                f"Mostra il passaggio recuperato – pagina {item['page']}"
-            ):
-                excerpt = item["text"]
+            excerpt = item["text"]
+            if len(excerpt) > 1200:
+                excerpt = excerpt[:1200] + "..."
+            st.markdown("**Passaggio originale recuperato**")
+            st.caption(excerpt)
+            st.divider()
 
-                if len(excerpt) > 1500:
-                    excerpt = excerpt[:1500] + "..."
+def coverage_label(best_score):
+    """
+    Indicatore euristico di copertura documentale.
+    NON è una misura di correttezza o affidabilità della risposta.
+    """
+    if best_score >= 0.16:
+        return "Alta", "Molti termini della domanda trovano corrispondenza nei passaggi recuperati."
+    if best_score >= 0.07:
+        return "Media", "La documentazione contiene passaggi pertinenti, ma la corrispondenza è parziale."
+    if best_score >= 0.015:
+        return "Limitata", "La risposta è possibile, ma i passaggi recuperati sono meno vicini alla formulazione della domanda."
+    return "Insufficiente", "Non è stato trovato un passaggio abbastanza pertinente per rispondere in modo affidabile."
 
-                st.write(excerpt)
+def show_transparency(results, best_score):
+    label, explanation = coverage_label(best_score)
+    docs = len({r["source"] for r in results if r.get("score", 0) > 0})
+    with st.expander("🔎 Perché questa risposta? · Trasparenza del recupero"):
+        st.markdown(
+            f"**Copertura documentale: {label}**  \n"
+            f"{explanation}  \n"
+            f"Passaggi esaminati per la risposta: **{len(results)}** · Documenti coinvolti: **{docs}**."
+        )
+        st.caption(
+            "L'indicatore descrive solo quanto la domanda assomiglia testualmente ai passaggi recuperati. "
+            "Non è una percentuale di affidabilità e non certifica la correttezza della risposta."
+        )
+
+def build_download_text(question, answer, results):
+    lines = [
+        "IA IN CANTIERE — RISPOSTA ESPORTATA",
+        "",
+        f"Domanda: {question}",
+        "",
+        "Risposta:",
+        answer,
+        "",
+        "Fonti recuperate:"
+    ]
+    for item in unique_source_results(results, max_items=5):
+        article = ""
+        if item.get("articles"):
+            article = " · art. " + ", ".join(item["articles"][:2])
+        lines.append(f"- {item['source_pretty']}{article} · pagina {item['page']}")
+    lines += [
+        "",
+        "Nota: contenuto a scopo formativo; verificare sempre la documentazione ufficiale e le procedure applicabili."
+    ]
+    return "\n".join(lines)
 
 # ------------------------------------------------------------
 # GENERAZIONE RISPOSTA CHAT
@@ -647,6 +814,9 @@ if "quiz" not in st.session_state:
 if "quiz_sources" not in st.session_state:
     st.session_state.quiz_sources = None
 
+if "pending_question" not in st.session_state:
+    st.session_state.pending_question = None
+
 # ------------------------------------------------------------
 # HOME / SELEZIONE ARGOMENTO
 # ------------------------------------------------------------
@@ -657,6 +827,34 @@ if st.session_state.selected_topic is None:
         "Seleziona l'area sulla quale vuoi fare una domanda, seguire una micro-lezione "
         "oppure metterti alla prova con uno scenario."
     )
+
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Documenti", len(file_payloads))
+    m2.metric("Sezioni indicizzate", len(records))
+    m3.metric("Lingue", len(LANGUAGES))
+    m4.metric("Modalità", 3)
+
+    st.markdown("### Cosa rende diverso il prototipo")
+    f1, f2, f3 = st.columns(3)
+    with f1:
+        st.markdown("<div class='feature-box'><b>📚 Risposte ancorate alle fonti</b><br><span class='small-muted'>Il modello riceve prima i passaggi recuperati dai PDF selezionati.</span></div>", unsafe_allow_html=True)
+    with f2:
+        st.markdown("<div class='feature-box'><b>🌍 Adattamento linguistico</b><br><span class='small-muted'>Una stessa base documentale può essere spiegata con registri e lingue differenti.</span></div>", unsafe_allow_html=True)
+    with f3:
+        st.markdown("<div class='feature-box'><b>🔎 Tracciabilità</b><br><span class='small-muted'>Documento, pagina e passaggio originale restano sempre consultabili.</span></div>", unsafe_allow_html=True)
+
+    with st.expander("⚙️ Come funziona in 5 passaggi", expanded=False):
+        cols = st.columns(5)
+        steps = [
+            ("1", "Domanda", "L'utente scrive in linguaggio naturale"),
+            ("2", "Ricerca", "TF-IDF individua i passaggi pertinenti"),
+            ("3", "Contesto", "I passaggi vengono forniti al modello"),
+            ("4", "Risposta", "Gemini riformula secondo lingua e livello"),
+            ("5", "Verifica", "L'utente può aprire la fonte originale"),
+        ]
+        for col, (num, title, desc) in zip(cols, steps):
+            with col:
+                st.markdown(f"<div class='flow-box'><b>{num}. {title}</b><br><span class='small-muted'>{desc}</span></div>", unsafe_allow_html=True)
 
     names = list(TOPICS.keys())
     row1 = st.columns(2)
@@ -703,6 +901,15 @@ st.markdown(
 
 st.caption(topic_info["description"])
 
+with st.expander("✨ Demo guidata · prova una domanda", expanded=False):
+    st.caption("Domande pronte per mostrare rapidamente il funzionamento del prototipo.")
+    quick_cols = st.columns(3)
+    for i, (col, prompt_text) in enumerate(zip(quick_cols, topic_info.get("prompts", []))):
+        with col:
+            if st.button(prompt_text, key=f"quick_{selected_topic}_{i}", use_container_width=True):
+                st.session_state.pending_question = prompt_text
+                st.rerun()
+
 tab_chat, tab_lesson, tab_quiz = st.tabs(
     ["💬 Chat", "🎓 Micro-lezione", "🎯 Quiz"]
 )
@@ -721,10 +928,17 @@ with tab_chat:
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
+            if msg["role"] == "assistant" and msg.get("sources"):
+                show_transparency(msg["sources"], msg.get("best_score", 0.0))
+                show_sources(msg["sources"])
 
-    question = st.chat_input(
+    typed_question = st.chat_input(
         f"Scrivi una domanda su: {selected_topic}..."
     )
+    question = typed_question
+    if st.session_state.pending_question and not question:
+        question = st.session_state.pending_question
+        st.session_state.pending_question = None
 
     if question:
         st.session_state.messages.append({
@@ -767,7 +981,17 @@ with tab_chat:
                     )
 
             st.markdown(answer)
+            show_transparency(results, best_score)
             show_sources(results)
+
+            export_text = build_download_text(question, answer, results)
+            st.download_button(
+                "⬇️ Esporta risposta e fonti",
+                data=export_text,
+                file_name="ia_in_cantiere_risposta.txt",
+                mime="text/plain",
+                use_container_width=False
+            )
 
             st.caption(
                 "⚠️ Strumento a scopo formativo. Verificare sempre procedure aziendali, "
@@ -776,7 +1000,9 @@ with tab_chat:
 
         st.session_state.messages.append({
             "role": "assistant",
-            "content": answer
+            "content": answer,
+            "sources": results,
+            "best_score": best_score
         })
 
 # ------------------------------------------------------------
@@ -820,6 +1046,8 @@ with tab_lesson:
         st.markdown(st.session_state.micro_lesson)
 
         if st.session_state.micro_sources:
+            micro_best = st.session_state.micro_sources[0]["score"] if st.session_state.micro_sources else 0.0
+            show_transparency(st.session_state.micro_sources, micro_best)
             show_sources(
                 st.session_state.micro_sources,
                 title="📚 Fonti della micro-lezione"
@@ -904,6 +1132,8 @@ with tab_quiz:
             st.write(quiz["explanation"])
 
         if st.session_state.quiz_sources:
+            quiz_best = st.session_state.quiz_sources[0]["score"] if st.session_state.quiz_sources else 0.0
+            show_transparency(st.session_state.quiz_sources, quiz_best)
             show_sources(
                 st.session_state.quiz_sources,
                 title="📚 Fonti del quiz"
@@ -913,3 +1143,9 @@ with tab_quiz:
             "⚠️ Il quiz ha finalità formative e non sostituisce la valutazione dei rischi "
             "o le procedure previste per l'attività reale."
         )
+
+
+st.markdown(
+    "<div class='footer'>IA in cantiere · prototipo sperimentale sviluppato nell'ambito di una tesi di laurea · 2026</div>",
+    unsafe_allow_html=True
+)
