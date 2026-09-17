@@ -78,6 +78,151 @@ st.markdown("""
     text-align: center;
     font-size: .88rem;
 }
+
+/* ---------------------------------------------------------
+   RESPONSIVE / MOBILE
+   Streamlit è già responsive; queste regole migliorano
+   leggibilità, card, tab, pulsanti e colonne su smartphone.
+   --------------------------------------------------------- */
+html, body, [class*="css"] {
+    overflow-wrap: anywhere;
+}
+
+[data-testid="stChatMessage"] {
+    max-width: 100%;
+}
+
+[data-testid="stChatMessageContent"],
+[data-testid="stMarkdownContainer"] {
+    overflow-wrap: anywhere;
+    word-break: normal;
+}
+
+.stTabs [data-baseweb="tab-list"] {
+    gap: .35rem;
+    overflow-x: auto;
+    scrollbar-width: thin;
+}
+
+.stTabs [data-baseweb="tab"] {
+    white-space: nowrap;
+}
+
+/* Smartphone e piccoli tablet */
+@media (max-width: 768px) {
+    .block-container {
+        max-width: 100%;
+        padding-top: .65rem;
+        padding-left: .85rem;
+        padding-right: .85rem;
+        padding-bottom: 5rem;
+    }
+
+    .hero {
+        padding: 1.05rem 1rem;
+        border-radius: 16px;
+        margin-bottom: .7rem;
+    }
+
+    .hero h1 {
+        font-size: 1.78rem;
+        line-height: 1.15;
+    }
+
+    .hero p {
+        font-size: .98rem;
+        line-height: 1.4;
+    }
+
+    .badge {
+        font-size: .74rem;
+        padding: .22rem .45rem;
+        margin-right: .18rem;
+        margin-top: .28rem;
+    }
+
+    .topic-box, .feature-box, .flow-box {
+        min-height: auto;
+        padding: .85rem;
+        border-radius: 14px;
+    }
+
+    .topic-box h3 {
+        font-size: 1.12rem;
+        margin-bottom: .35rem;
+    }
+
+    .small-muted {
+        font-size: .86rem;
+    }
+
+    /* Impila le colonne Streamlit su schermi stretti. */
+    [data-testid="stHorizontalBlock"] {
+        flex-wrap: wrap !important;
+        gap: .55rem !important;
+    }
+
+    [data-testid="column"] {
+        flex: 1 1 100% !important;
+        width: 100% !important;
+        min-width: 100% !important;
+    }
+
+    /* I pulsanti diventano comodi da toccare con il pollice. */
+    .stButton > button,
+    .stDownloadButton > button {
+        width: 100%;
+        min-height: 2.75rem;
+        white-space: normal;
+        line-height: 1.25;
+    }
+
+    /* Tab compatti e scorrevoli orizzontalmente. */
+    .stTabs [data-baseweb="tab-list"] {
+        justify-content: flex-start;
+        overflow-x: auto;
+        padding-bottom: .15rem;
+    }
+
+    .stTabs [data-baseweb="tab"] {
+        font-size: .9rem;
+        padding-left: .75rem;
+        padding-right: .75rem;
+    }
+
+    /* Evita che testi lunghi nelle fonti escano dallo schermo. */
+    .source-box {
+        padding-left: .65rem;
+        overflow-wrap: anywhere;
+    }
+
+    .coverage-box {
+        padding: .65rem .75rem;
+    }
+
+    .footer {
+        margin-top: 1.4rem;
+        font-size: .78rem;
+        line-height: 1.35;
+    }
+}
+
+/* Telefoni molto stretti */
+@media (max-width: 420px) {
+    .block-container {
+        padding-left: .65rem;
+        padding-right: .65rem;
+    }
+
+    .hero h1 {
+        font-size: 1.55rem;
+    }
+
+    .badge {
+        display: inline-flex;
+        margin-bottom: .1rem;
+    }
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -96,6 +241,8 @@ st.info(
     "Prototipo a scopo formativo. Le risposte sono costruite solo sui documenti caricati. "
     "Non sostituisce formazione, addestramento, procedure aziendali o indicazioni dei soggetti responsabili della sicurezza."
 )
+
+st.caption("📱 Su smartphone le impostazioni (lingua, stile e PDF aggiuntivi) sono disponibili dal menu laterale ☰.")
 
 # ------------------------------------------------------------
 # DATI DI BASE
@@ -199,7 +346,7 @@ with st.sidebar:
     st.divider()
     st.markdown("**🎓 Progetto accademico**")
     st.caption(
-        "Versione v0.7 · prototipo sperimentale sviluppato per una tesi sulla formazione "
+        "Versione v0.8 · interfaccia responsive · prototipo sperimentale sviluppato per una tesi sulla formazione "
         "alla salute e sicurezza nei cantieri."
     )
 
@@ -1146,6 +1293,6 @@ with tab_quiz:
 
 
 st.markdown(
-    "<div class='footer'>IA in cantiere · prototipo sperimentale sviluppato nell'ambito di una tesi di laurea · 2026</div>",
+    "<div class='footer'>IA in cantiere · v0.8 responsive · prototipo sperimentale sviluppato nell'ambito di una tesi di laurea · 2026</div>",
     unsafe_allow_html=True
 )
